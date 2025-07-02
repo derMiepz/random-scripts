@@ -10,9 +10,9 @@ $saveGamePath = "C:\PATH\TO\MT\SAVEGAME"    #EXAMPLE "C:\Users\Administrator\Des
 
 function Show-Menu {
     Clear-Host
-    Write-Host "************************************"
+    Write-Host "************************************" -ForegroundColor Cyan
     Write-Host "*       FILE BACKUP UTILITY        *" -ForegroundColor Cyan
-    Write-Host "************************************"
+    Write-Host "************************************" -ForegroundColor Cyan
     Write-Host "1. Backup entire folder"
     Write-Host "2. Backup save-game only"
     Write-Host "3. Restore a backup"
