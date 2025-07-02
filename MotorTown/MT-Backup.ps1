@@ -10,11 +10,11 @@ $saveGamePath = "C:\PATH\TO\MT\SAVEGAME"    #EXAMPLE "C:\Users\Administrator\Des
 
 function Show-Menu {
     Clear-Host
-    Write-Host "************************************" -ForegroundColor Cyan
-    Write-Host "*       FILE BACKUP UTILITY        *" -ForegroundColor Cyan
-    Write-Host "************************************" -ForegroundColor Cyan
-    Write-Host "1. Backup entire folder"
-    Write-Host "2. Backup save-game only"
+    Write-Host "*****************************************" -ForegroundColor Cyan
+    Write-Host "*       MT Server Backup Utility       *" -ForegroundColor Cyan
+    Write-Host "*****************************************" -ForegroundColor Cyan
+    Write-Host "1. Backup entire folder (SERVER)"
+    Write-Host "2. Backup save-game only (SAVEGAME)"
     Write-Host "3. Restore a backup"
     Write-Host "4. Exit"
     Write-Host "`nPress a number key (1-4) to select an option"
@@ -22,11 +22,11 @@ function Show-Menu {
 
 function Backup-EntireFolder {
     $timestamp = Get-Date -Format "dd.MM.yyyy - HH-mm"
-    $backupPath = Join-Path -Path $backupRoot -ChildPath $timestamp
+    $backupPath = Join-Path -Path $backupRoot -ChildPath "$timestamp - SERVER"
     
     try {
         New-Item -ItemType Directory -Path $backupPath -ErrorAction Stop | Out-Null
-        Write-Host "`nStarting backup..." -ForegroundColor Yellow
+        Write-Host "`nStarting SERVER backup..." -ForegroundColor Yellow
         robocopy $sourceFolder $backupPath /MIR /NFL /NDL /NJH /NJS /R:3 /W:5
         
         # Validate robocopy exit code
@@ -34,7 +34,7 @@ function Backup-EntireFolder {
             throw "Robocopy failed with exit code $LASTEXITCODE"
         }
         
-        Write-Host "`nBackup completed successfully to: $backupPath" -ForegroundColor Green
+        Write-Host "`nSERVER backup completed to: $backupPath" -ForegroundColor Green
     }
     catch {
         Write-Host "`nERROR: Backup failed - $_" -ForegroundColor Red
@@ -51,13 +51,12 @@ function Backup-SaveGame {
         return
     }
 
-    $folderName = Split-Path $saveGamePath -Leaf
     $timestamp = Get-Date -Format "dd.MM.yyyy - HH-mm"
-    $backupPath = Join-Path -Path $backupRoot -ChildPath "$timestamp - $folderName"
+    $backupPath = Join-Path -Path $backupRoot -ChildPath "$timestamp - SAVEGAME"
     
     try {
         New-Item -ItemType Directory -Path $backupPath -ErrorAction Stop | Out-Null
-        Write-Host "`nStarting save-game backup..." -ForegroundColor Yellow
+        Write-Host "`nStarting SAVEGAME backup..." -ForegroundColor Yellow
         robocopy $saveGamePath $backupPath /MIR /NFL /NDL /NJH /NJS
         
         # Validate robocopy exit code
@@ -65,7 +64,7 @@ function Backup-SaveGame {
             throw "Robocopy failed with exit code $LASTEXITCODE"
         }
         
-        Write-Host "`nSave-game backup completed to: $backupPath" -ForegroundColor Green
+        Write-Host "`nSAVEGAME backup completed to: $backupPath" -ForegroundColor Green
     }
     catch {
         Write-Host "`nERROR: Save-game backup failed - $_" -ForegroundColor Red
@@ -96,13 +95,18 @@ function Restore-Backup {
         $backupPath = $selectedBackup.FullName
         
         # Determine restore type based on folder name pattern
-        if ($selectedBackup.Name -match " - Saved$") {
+        if ($selectedBackup.Name -match " - SAVEGAME$") {
             $restorePath = $saveGamePath
             $restoreType = "SAVE-GAME"
         }
-        else {
+        elseif ($selectedBackup.Name -match " - SERVER$") {
             $restorePath = $sourceFolder
             $restoreType = "FULL SERVER"
+        }
+        else {
+            Write-Host "`nUnknown backup type! Using default restore location." -ForegroundColor Yellow
+            $restorePath = $sourceFolder
+            $restoreType = "GENERIC"
         }
 
         # Check if destination exists
@@ -162,7 +166,7 @@ function Restore-Backup {
 # Main program
 try {
     # Set console title
-    $Host.UI.RawUI.WindowTitle = "Server Backup Utility"
+    $Host.UI.RawUI.WindowTitle = "MT Server Backup Utility"
     
     # Set window size for better visibility
     $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (120, 300)
@@ -183,7 +187,7 @@ try {
             '2' { Backup-SaveGame }
             '3' { Restore-Backup }
             '4' { 
-                Write-Host "`nExiting... Thank you for using the Backup Utility!" -ForegroundColor Cyan
+                Write-Host "`nExiting... Thank you for using the MT Server Backup Utility!" -ForegroundColor Cyan
                 Start-Sleep -Seconds 2
                 exit 
             }
