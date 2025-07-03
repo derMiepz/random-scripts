@@ -11,31 +11,58 @@ Good: ✔️ BackupUtility.ps1
 ----------
 ### Setup Instructions
 
-1.  **Configure Paths**  (Lines 7-9):\
-\
-$backupRoot = "C:\PATH\TO\BACKUP\FOLDER"\
-$sourceFolder = "C:\PATH\TO\SERVERFILES"\
-$saveGamePath = "C:\PATH\TO\SAVEGAME"
-    
-3.  **Run**:
-    
-    -   Double-click script file, or
-        
-    -   Execute in PowerShell:  `.\Backup-Utility.ps1`
+1.  **Configure Paths**
+```
+# ===== CONFIGURATION =====
+$backupRoot = "C:\YOUR\BACKUP\PATH\" #EXAMPLE "C:\Users\Administrator\Desktop\WGSM Backups"
+
+# Define your servers here
+$servers = @(
+    @{
+        Name = "SET SERVERNAME 1 HERE"
+        SourceFolder = "C:\PATH\TO\SERVERFILES" #EXAMPLE "C:\Users\Administrator\Desktop\WindowsGSM\servers\1\serverfiles"
+        SaveGamePath = "C:\PATH\TO\SAVEGAME"    #EXAMPLE "C:\Users\Administrator\Desktop\WindowsGSM\servers\1\serverfiles\MotorTown\Saved"
+    },
+    @{
+        Name = "SET SERVERNAME 2 HERE"
+        SourceFolder = "C:\PATH\TO\SERVERFILES" #EXAMPLE "C:\Users\Administrator\Desktop\WindowsGSM\servers\2\serverfiles"
+        SaveGamePath = "C:\PATH\TO\SAVEGAME"    #EXAMPLE "C:\Users\Administrator\Desktop\WindowsGSM\servers\2\serverfiles\SCUM\Saved"
+    }
+```
+2. **Usage**\
+   -> **Configure**: Edit server list at script start and set backup path\
+   -> **Run**: Double-click script file\
+   -> **Navigate**:\
+   &nbsp;&nbsp;&nbsp;-  Select server -> Choose operation\
+   &nbsp;&nbsp;&nbsp;-  Use single-key nagivation (no Enter needed)\
 
 ## How the script works
 
 ```mermaid
-graph TD
-A[Start Restore] --> B{Path exists?}
-B -->|No| C[Warn user and offer creation]
-C -->|User says Yes| D[Create folder]
-C -->|User says No| E[Cancel restore]
-D --> F[Show restore warning]
-B -->|Yes| F
-F --> G{User confirms?}
-G -->|Yes| H[Perform restore]
-G -->|No| I[Cancel restore]
+sequenceDiagram
+    User->>Script: Double-click to run
+    Script->>System: Request admin privileges
+    System->>Script: Grant admin rights
+    Script->>User: Display main menu
+    User->>Script: Select server
+    Script->>User: Show server operations
+    User->>Script: Choose backup/restore
+    
+    alt Backup
+        Script->>Script: Create folder structure
+        Script->>Robocopy: Mirror files to backup
+        Robocopy->>Script: Return exit code
+        Script->>User: Show success/error
+    else Restore
+        Script->>User: List available backups
+        User->>Script: Select backup
+        Script->>Script: Identify content folder
+        Script->>User: Confirm restoration
+        User->>Script: Confirm
+        Script->>Robocopy: Mirror to destination
+        Robocopy->>Script: Return exit code
+        Script->>User: Show results
+    end
 ```
 ## Key Features
 
@@ -45,49 +72,42 @@ G -->|No| I[Cancel restore]
     -   Color-coded status messages (success/green, errors/red, warnings/yellow)
     -   Clear operation prompts
         
-2.  **Flexible Backup Options**
+2.  **Multi-Server Management**
     
-    -   **Full Server Backup**: Mirrors entire server directory
+    -   Centralized control for multiple game servers
+    -   Server-specific backup/restore operations
+    -   Dynamic configuration using hash tables
         
-    -   **Save-Game Backup**: Targets only game save files
-        
-    -   **Timestamped Archives**: Automatic folder naming (e.g.,  `31.01.2025 - 14-30 - SAVEGAME`)
-        
-3.  **Smart Restore System**
+3.  **Intelligent Folder Structure**
+```mermaid
+graph LR
+A[Backup Root] --> B[Server 1]
+A --> C[Server 2]
+B --> D["03.07.2025 - 01-40 - SERVER"]
+B --> E["03.07.2025 - 01-45 - SAVEGAME"]
+D --> F[serverfiles]
+E --> G[Saved]
+F --> H[Actual server files]
+G --> I[Actual save files]
+```
+-  Automatic folder naming based on source paths
+
+-  Timestamped backups with type identification
+
+-  Content stored in properly named subfolders
+4.  **Safety First**
     
-    -   Automatic detection of backup type (full server vs. save-games)
+    -   Restoration confirmation prompts
+    -   Clear warnings about destructive operations
+    -   Fallback mechanisms for legacy backups
+    -   Color-coded status messages
         
-    -   Missing folder creation with user confirmation
-        
-    -   Safety prompts to prevent accidental data overwrites
-        
-    -   Restore path validation
-        
-4.  **Enterprise-Grade Operations**
+5.  **Smart Operations**
     
-    -   Robocopy with mirroring (`/MIR`) for efficient delta copying
-        
-    -   Exit code validation (handles file locks/errors)
-        
-    -   Retry logic for busy files (`/R:3 /W:5`)
-        
-5.  **Self-Elevating Privileges**
-    
-    -   Auto-restarts as Administrator when needed
-        
-    -   Bypasses execution policy restrictions
-        
-    -   Handles UAC prompts seamlessly
-        
-6.  **User Experience Enhancements**
-    
-    -   Console window sizing/coloring optimization
-        
-    -   Progress indicators during operations
-        
-    -   Error trapping with descriptive messages
-        
-    -   Pause prompts for readability
+    -   Automatic privilege escalation
+    -   Robocopy with validation (retries + exit code checking)
+    -   Missing folder detection and creation prompts
+    -   Backup type recognition during restore
         
 
 ----------
