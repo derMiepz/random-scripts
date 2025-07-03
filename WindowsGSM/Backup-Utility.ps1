@@ -30,7 +30,7 @@ $servers = @(
 function Show-MainMenu {
     Clear-Host
     Write-Host "************************************" -ForegroundColor Cyan
-    Write-Host "*        WGSM BACKUP UTILITY        *" -ForegroundColor Cyan
+    Write-Host "*        WGSM BACKUP UTILITY       *" -ForegroundColor Cyan
     Write-Host "************************************" -ForegroundColor Cyan
     Write-Host "1. Select Server"
     Write-Host "2. Exit"
@@ -46,7 +46,7 @@ function Show-ServerMenu {
     Write-Host "************************************" -ForegroundColor Yellow
     Write-Host "*       SERVER: $($server.Name.PadRight(14))     *" -ForegroundColor Yellow
     Write-Host "************************************" -ForegroundColor Yellow
-    Write-Host "1. Backup entire folder (SERVER)"
+    Write-Host "1. Backup entire server folder (SERVER)"
     Write-Host "2. Backup save-game only (SAVEGAME)"
     Write-Host "3. Restore a backup"
     Write-Host "4. Back to server selection"
