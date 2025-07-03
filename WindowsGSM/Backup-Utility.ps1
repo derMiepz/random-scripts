@@ -4,37 +4,101 @@ if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     exit
 }
 
-$backupRoot = "C:\PATH\TO\BACKUP\FOLDER"    #EXAMPLE "C:\Users\Administrator\Desktop\MT Backups"
-$sourceFolder = "C:\PATH\TO\SERVERFILES" #EXAMPLE "C:\Users\Administrator\Desktop\WindowsGSM\servers\1\serverfiles"
-$saveGamePath = "C:\PATH\TO\SAVEGAME"    #EXAMPLE "C:\Users\Administrator\Desktop\WindowsGSM\servers\1\serverfiles\MotorTown\Saved"
+# ===== CONFIGURATION =====
+$backupRoot = "C:\PATH\TO\BACKUP\FOLDER"  #EXAMPLE "C:\Users\Administrator\Desktop\WGSM Backups"
 
-function Show-Menu {
+# Define your servers here
+$servers = @(
+    @{
+        Name = "SET SERVERNAME 1 HERE"
+        SourceFolder = "C:\PATH\TO\SERVERFILES" #EXAMPLE "C:\Users\Administrator\Desktop\WindowsGSM\servers\1\serverfiles"
+        SaveGamePath = "C:\PATH\TO\SAVEGAME"    #EXAMPLE "C:\Users\Administrator\Desktop\WindowsGSM\servers\1\serverfiles\MotorTown\Saved"
+    },
+    @{
+        Name = "SET SERVERNAME 2 HERE"
+        SourceFolder = "C:\PATH\TO\SERVERFILES" #EXAMPLE "C:\Users\Administrator\Desktop\WindowsGSM\servers\2\serverfiles"
+        SaveGamePath = "C:\PATH\TO\SAVEGAME"    #EXAMPLE "C:\Users\Administrator\Desktop\WindowsGSM\servers\2\serverfiles\SCUM\Saved"
+    }
+    # Add more servers as needed
+    # !!! IMPORTANT !!!
+    # When adding more servers, make sure to add a "," after every bracket --> }, <--
+    # Except for the last one or you will get an ERROR.
+    # See above, line 16 and 21
+)
+
+# ===== FUNCTIONS =====
+function Show-MainMenu {
     Clear-Host
-    Write-Host "****************************************" -ForegroundColor Cyan
-    Write-Host "*       WGSM Server Backup Utility     *" -ForegroundColor Cyan
-    Write-Host "****************************************" -ForegroundColor Cyan
+    Write-Host "************************************" -ForegroundColor Cyan
+    Write-Host "*        WGSM BACKUP UTILITY        *" -ForegroundColor Cyan
+    Write-Host "************************************" -ForegroundColor Cyan
+    Write-Host "1. Select Server"
+    Write-Host "2. Exit"
+    Write-Host "`nPress a number key (1-2) to select an option"
+}
+
+function Show-ServerMenu {
+    param (
+        [hashtable]$server
+    )
+    
+    Clear-Host
+    Write-Host "************************************" -ForegroundColor Yellow
+    Write-Host "*       SERVER: $($server.Name.PadRight(14))     *" -ForegroundColor Yellow
+    Write-Host "************************************" -ForegroundColor Yellow
     Write-Host "1. Backup entire folder (SERVER)"
     Write-Host "2. Backup save-game only (SAVEGAME)"
     Write-Host "3. Restore a backup"
-    Write-Host "4. Exit"
-    Write-Host "`nPress a number key (1-4) to select an option"
+    Write-Host "4. Back to server selection"
+    Write-Host "5. Exit"
+    Write-Host "`nPress a number key (1-5) to select an option"
+}
+
+function Show-ServerSelection {
+    Clear-Host
+    Write-Host "************************************" -ForegroundColor Green
+    Write-Host "*    SELECT SERVER TO MANAGE       *" -ForegroundColor Green
+    Write-Host "************************************" -ForegroundColor Green
+    for ($i = 0; $i -lt $servers.Count; $i++) {
+        Write-Host "$($i+1). $($servers[$i].Name)"
+    }
+    Write-Host "$($servers.Count+1). Back to Main Menu"
+    Write-Host "$($servers.Count+2). Exit"
+    Write-Host "`nPress a number key (1-$($servers.Count+2)) to select an option"
 }
 
 function Backup-EntireFolder {
+    param (
+        [hashtable]$server
+    )
+    
+    $serverBackupRoot = Join-Path -Path $backupRoot -ChildPath $server.Name
     $timestamp = Get-Date -Format "dd.MM.yyyy - HH-mm"
-    $backupPath = Join-Path -Path $backupRoot -ChildPath "$timestamp - SERVER"
+    $backupType = "SERVER"
+    $folderName = Split-Path $server.SourceFolder -Leaf
+    $backupPath = Join-Path -Path $serverBackupRoot -ChildPath "$timestamp - $backupType"
+    $targetPath = Join-Path -Path $backupPath -ChildPath $folderName
     
     try {
-        New-Item -ItemType Directory -Path $backupPath -ErrorAction Stop | Out-Null
-        Write-Host "`nStarting SERVER backup..." -ForegroundColor Yellow
-        robocopy $sourceFolder $backupPath /MIR /NFL /NDL /NJH /NJS /R:3 /W:5
+        # Create directory structure
+        if (-not (Test-Path $serverBackupRoot)) {
+            New-Item -ItemType Directory -Path $serverBackupRoot | Out-Null
+        }
         
-        # Validate robocopy exit code
+        New-Item -ItemType Directory -Path $backupPath -Force | Out-Null
+        New-Item -ItemType Directory -Path $targetPath -ErrorAction Stop | Out-Null
+        
+        Write-Host "`nStarting SERVER backup for $($server.Name)..." -ForegroundColor Yellow
+        Write-Host "Source: $($server.SourceFolder)"
+        Write-Host "Backup: $targetPath"
+        
+        robocopy $server.SourceFolder $targetPath /MIR /NFL /NDL /NJH /NJS /R:3 /W:5
+        
         if ($LASTEXITCODE -ge 8) {
             throw "Robocopy failed with exit code $LASTEXITCODE"
         }
         
-        Write-Host "`nSERVER backup completed to: $backupPath" -ForegroundColor Green
+        Write-Host "`nSERVER backup completed to: $targetPath" -ForegroundColor Green
     }
     catch {
         Write-Host "`nERROR: Backup failed - $_" -ForegroundColor Red
@@ -45,29 +109,46 @@ function Backup-EntireFolder {
 }
 
 function Backup-SaveGame {
-    if (-not (Test-Path -Path $saveGamePath -PathType Container)) {
-        Write-Host "`nSave-game folder not found: $saveGamePath" -ForegroundColor Red
+    param (
+        [hashtable]$server
+    )
+    
+    if (-not (Test-Path -Path $server.SaveGamePath -PathType Container)) {
+        Write-Host "`nSave-game folder not found: $($server.SaveGamePath)" -ForegroundColor Red
         Read-Host "`nPress Enter to continue"
         return
     }
 
+    $serverBackupRoot = Join-Path -Path $backupRoot -ChildPath $server.Name
     $timestamp = Get-Date -Format "dd.MM.yyyy - HH-mm"
-    $backupPath = Join-Path -Path $backupRoot -ChildPath "$timestamp - SAVEGAME"
+    $backupType = "SAVEGAME"
+    $folderName = Split-Path $server.SaveGamePath -Leaf
+    $backupPath = Join-Path -Path $serverBackupRoot -ChildPath "$timestamp - $backupType"
+    $targetPath = Join-Path -Path $backupPath -ChildPath $folderName
     
     try {
-        New-Item -ItemType Directory -Path $backupPath -ErrorAction Stop | Out-Null
-        Write-Host "`nStarting SAVEGAME backup..." -ForegroundColor Yellow
-        robocopy $saveGamePath $backupPath /MIR /NFL /NDL /NJH /NJS
+        # Create directory structure
+        if (-not (Test-Path $serverBackupRoot)) {
+            New-Item -ItemType Directory -Path $serverBackupRoot | Out-Null
+        }
         
-        # Validate robocopy exit code
+        New-Item -ItemType Directory -Path $backupPath -Force | Out-Null
+        New-Item -ItemType Directory -Path $targetPath -ErrorAction Stop | Out-Null
+        
+        Write-Host "`nStarting SAVEGAME backup for $($server.Name)..." -ForegroundColor Yellow
+        Write-Host "Source: $($server.SaveGamePath)"
+        Write-Host "Backup: $targetPath"
+        
+        robocopy $server.SaveGamePath $targetPath /MIR /NFL /NDL /NJH /NJS
+        
         if ($LASTEXITCODE -ge 8) {
             throw "Robocopy failed with exit code $LASTEXITCODE"
         }
         
-        Write-Host "`nSAVEGAME backup completed to: $backupPath" -ForegroundColor Green
+        Write-Host "`nSAVEGAME backup completed to: $targetPath" -ForegroundColor Green
     }
     catch {
-        Write-Host "`nERROR: Save-game backup failed - $_" -ForegroundColor Red
+        Write-Host "`nERROR: SAVEGAME backup failed - $_" -ForegroundColor Red
     }
     finally {
         Read-Host "`nPress Enter to return to menu"
@@ -75,14 +156,25 @@ function Backup-SaveGame {
 }
 
 function Restore-Backup {
-    $backups = Get-ChildItem -Path $backupRoot -Directory | Sort-Object CreationTime -Descending
+    param (
+        [hashtable]$server
+    )
+    
+    $serverBackupRoot = Join-Path -Path $backupRoot -ChildPath $server.Name
+    
+    # Create server-specific backup directory if it doesn't exist
+    if (-not (Test-Path $serverBackupRoot)) {
+        New-Item -ItemType Directory -Path $serverBackupRoot | Out-Null
+    }
+    
+    $backups = Get-ChildItem -Path $serverBackupRoot -Directory | Sort-Object CreationTime -Descending
     if (-not $backups) {
-        Write-Host "`nNo backups found!" -ForegroundColor Red
+        Write-Host "`nNo backups found for $($server.Name)!" -ForegroundColor Red
         Read-Host "`nPress Enter to continue"
         return
     }
 
-    Write-Host "`nAvailable Backups:"
+    Write-Host "`nAvailable Backups for $($server.Name):"
     $i = 1
     $backups | ForEach-Object {
         Write-Host "$i. $($_.Name)"
@@ -96,21 +188,42 @@ function Restore-Backup {
         
         # Determine restore type based on folder name pattern
         if ($selectedBackup.Name -match " - SAVEGAME$") {
-            $restorePath = $saveGamePath
+            $restorePath = $server.SaveGamePath
             $restoreType = "SAVE-GAME"
+            $expectedFolder = Split-Path $server.SaveGamePath -Leaf
         }
         elseif ($selectedBackup.Name -match " - SERVER$") {
-            $restorePath = $sourceFolder
+            $restorePath = $server.SourceFolder
             $restoreType = "FULL SERVER"
+            $expectedFolder = Split-Path $server.SourceFolder -Leaf
         }
         else {
             Write-Host "`nUnknown backup type! Using default restore location." -ForegroundColor Yellow
-            $restorePath = $sourceFolder
+            $restorePath = $server.SourceFolder
             $restoreType = "GENERIC"
+            $expectedFolder = Split-Path $server.SourceFolder -Leaf
+        }
+
+        # Find the actual content folder in the backup
+        $contentPath = $null
+        $backupContent = Get-ChildItem -Path $backupPath -Directory
+        
+        # Check if we have the expected folder structure
+        if ($backupContent.Count -eq 1 -and $backupContent[0].Name -eq $expectedFolder) {
+            $contentPath = $backupContent[0].FullName
+        }
+        # Fallback: use first folder if structure doesn't match
+        elseif ($backupContent.Count -ge 1) {
+            $contentPath = $backupContent[0].FullName
+            Write-Host "`n[!] Using folder '$($backupContent[0].Name)' for restore" -ForegroundColor Yellow
+        }
+        # Fallback: use root if no folders
+        else {
+            $contentPath = $backupPath
+            Write-Host "`n[!] Backup doesn't contain subfolders - restoring from root" -ForegroundColor Yellow
         }
 
         # Check if destination exists
-        $pathMissing = $false
         if (-not (Test-Path $restorePath -PathType Container)) {
             Write-Host "`n[!] Destination folder not found: $restorePath" -ForegroundColor Yellow
             $createFolder = Read-Host "Would you like to create this folder? (Y/N)"
@@ -137,6 +250,7 @@ function Restore-Backup {
         Write-Host "`n[!] WARNING: This will replace all contents in the destination!" -ForegroundColor Red
         Write-Host "Restore type: $restoreType"
         Write-Host "Backup: $($selectedBackup.Name)"
+        Write-Host "Source: $contentPath"
         Write-Host "Destination: $restorePath"
         
         $confirmation = Read-Host "`nConfirm restore? (Y/N)"
@@ -147,8 +261,8 @@ function Restore-Backup {
         }
 
         # Perform restore
-        Write-Host "`nStarting restore..." -ForegroundColor Yellow
-        robocopy $backupPath $restorePath /MIR /NFL /NDL /NJH /NJS
+        Write-Host "`nStarting restore for $($server.Name)..." -ForegroundColor Yellow
+        robocopy $contentPath $restorePath /MIR /NFL /NDL /NJH /NJS
         
         if ($LASTEXITCODE -ge 8) {
             Write-Host "`nERROR: Restore failed! Robocopy exit code: $LASTEXITCODE" -ForegroundColor Red
@@ -163,31 +277,73 @@ function Restore-Backup {
     Read-Host "`nPress Enter to return to menu"
 }
 
-# Main program
+# ===== MAIN PROGRAM =====
 try {
     # Set console title
-    $Host.UI.RawUI.WindowTitle = "WGSM Server Backup Utility"
+    $Host.UI.RawUI.WindowTitle = "WGSM Backup Utility"
     
     # Set window size for better visibility
-    $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (120, 300)
-    $Host.UI.RawUI.WindowSize = New-Object Management.Automation.Host.Size (120, 40)
+    $bufferWidth = [Math]::Max(120, $Host.UI.RawUI.BufferSize.Width)
+    $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size ($bufferWidth, 300)
+    $Host.UI.RawUI.WindowSize = New-Object Management.Automation.Host.Size ($bufferWidth, 40)
     
     # Set colors for better visibility
     $Host.UI.RawUI.BackgroundColor = "Black"
     $Host.UI.RawUI.ForegroundColor = "White"
     Clear-Host
 
-    do {
-        Show-Menu
-        # Get single key press without requiring Enter
+    :mainLoop do {
+        Show-MainMenu
         $key = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         
         switch ($key.Character) {
-            '1' { Backup-EntireFolder }
-            '2' { Backup-SaveGame }
-            '3' { Restore-Backup }
-            '4' { 
-                Write-Host "`nExiting... Thank you for using the WGSM Server Backup Utility!" -ForegroundColor Cyan
+            '1' {
+                do {
+                    Show-ServerSelection
+                    $serverKey = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+                    $selection = [int]$serverKey.Character - 48  # Convert char to int
+                    
+                    if ($selection -ge 1 -and $selection -le $servers.Count) {
+                        $selectedServer = $servers[$selection-1]
+                        
+                        :serverLoop do {
+                            Show-ServerMenu -server $selectedServer
+                            $actionKey = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+                            
+                            switch ($actionKey.Character) {
+                                '1' { Backup-EntireFolder -server $selectedServer }
+                                '2' { Backup-SaveGame -server $selectedServer }
+                                '3' { Restore-Backup -server $selectedServer }
+                                '4' { break serverLoop }
+                                '5' { 
+                                    Write-Host "`nExiting... Thank you for using the WGSM Backup Utility!" -ForegroundColor Cyan
+                                    Start-Sleep -Seconds 2
+                                    exit 
+                                }
+                                default { 
+                                    Write-Host "`nInvalid option! Please try again." -ForegroundColor Red
+                                    Start-Sleep -Seconds 1
+                                }
+                            }
+                        } while ($true)
+                    }
+                    elseif ($selection -eq ($servers.Count + 1)) {
+                        # Back to main menu
+                        break
+                    }
+                    elseif ($selection -eq ($servers.Count + 2)) {
+                        Write-Host "`nExiting... Thank you for using the WGSM Backup Utility!" -ForegroundColor Cyan
+                        Start-Sleep -Seconds 2
+                        exit
+                    }
+                    else {
+                        Write-Host "`nInvalid server selection!" -ForegroundColor Red
+                        Start-Sleep -Seconds 1
+                    }
+                } while ($true)
+            }
+            '2' { 
+                Write-Host "`nExiting... Thank you for using the WGSM Backup Utility!" -ForegroundColor Cyan
                 Start-Sleep -Seconds 2
                 exit 
             }
